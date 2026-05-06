@@ -108,29 +108,6 @@ function sanitize(input) {
 
 const TOKEN = "8450485773:AAGpmoBJvby3AID_YOzqhkDCdbfz6jZg5Kc";
 const bot = new TelegramBot(TOKEN, { polling: true });
-const ID_GROUP = [
-    -1002918587252
-];
-
-const ID_GROUP_UTAMA = [
-    -1002918587252
-];
-
-function sendToGroups(text, options = {}) {
-    for (const groupid of ID_GROUP) {
-        bot.sendMessage(groupid, text, options).catch(err => {
-            console.error(`Gagal kirim ke ${groupid}:`, err.response?.body || err.message);
-        });
-    }
-}
-
-function sendToGroupsUtama(text, options = {}) {
-    for (const groupid of ID_GROUP_UTAMA) {
-        bot.sendMessage(groupid, text, options).catch(err => {
-            console.error(`Gagal kirim ke ${groupid}:`, err.response?.body || err.message);
-        });
-    }
-}
 const OWNER_ID = 7277892050;
   
 wss.on('connection', function (ws, req) {
@@ -1799,7 +1776,7 @@ const RESTART_INTERVAL = 20 * 60 * 1000;
 
 function kirimStatusServer(pesan) {
   try {
-    sendToGroupsUtama(`👁️‍🗨️ *STATUS PANEL :*\n${pesan}`, { parse_mode: "Markdown" });
+    console.log(`👁️‍🗨️ *STATUS PANEL :*\n${pesan}`);
   } catch (err) {
     console.error("Gagal kirim status ke Telegram:", err.message);
   }
