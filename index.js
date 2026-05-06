@@ -355,37 +355,6 @@ function isExpired(user) {
   return expired;
 }
 
-app.get("/getInfo", async (req, res) => {
-  const { key, number } = req.query;
-  const keyInfo = activeKeys[key];
-  if (!keyInfo) return res.json({ valid: false });
-
-  const bizKeys = Object.keys(biz);
-  if (!bizKeys.length) return res.json({ valid: false, message: "No connection" });
-
-  const sock = biz[bizKeys[Math.floor(Math.random() * bizKeys.length)]];
-  const jid = number.includes("@") ? number : number + "@s.whatsapp.net";
-
-  try {
-    const ppUrl = await sock.profilePictureUrl(jid, 'image').catch(() => null);
-    const statusObj = await sock.fetchStatus(jid).catch(() => null);
-    const check = await sock.onWhatsApp(number).catch(() => []);
-    const info = check[0] || {};
-
-    return res.json({
-      valid: true,
-      number: number,
-      photo: ppUrl || "https://static.vecteezy.com/system/resources/previews/009/292/244/non_2x/default-avatar-icon-of-social-media-user-vector.jpg",
-      bio: statusObj?.status || "No bio",
-      online: !!statusObj?.lastSeen,
-      type: info.biz ? "business" : "personal"
-    });
-  } catch (err) {
-    console.warn("[❌ GETINFO ERROR]", err.message);
-    return res.json({ valid: false, message: "Query failed" });
-  }
-});
-
 const KEY_LIST_FILE = path.join(__dirname, 'keyList.json');
 
 function loadKeyList() {
