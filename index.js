@@ -661,7 +661,7 @@ app.get("/deleteUser", (req, res) => {
 });
 
 app.get('/ping', (req, res) => {
-  res.send('pong');
+  res.send('yahaha nungguin yaa hahaha🤣');
 });
 
 app.get("/listUsers", (req, res) => {
